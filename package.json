@@ -1,0 +1,36 @@
+{
+  "name": "edenred",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "start": "parcel src/index.html --dist-dir build",
+    "dist": "parcel build src/index.html --public-url .",
+    "format": "prettier --write src{,/**}/*.{ts,scss} package.json tsconfig.json",
+    "build": "parcel build src/index.html --dist-dir build",
+    "checkTypes": "tsc --noEmit",
+    "checkFormatting": "yarn prettier --check ./src",
+    "checkLinting": "yarn eslint src",
+    "checkAll": "yarn checkTypes && yarn checkLinting && yarn checkFormatting"
+  },
+  "keywords": [],
+  "author": "Jesse Himmelstein",
+  "license": "MIT",
+  "dependencies": {
+    "booyah": "link:./booyah"
+  },
+  "devDependencies": {
+    "@babel/register": "^7.18.9",
+    "@parcel/packager-raw-url": "2.8.3",
+    "@parcel/transformer-sass": "2.8.3",
+    "@typescript-eslint/eslint-plugin": "^5.44.0",
+    "@typescript-eslint/parser": "^5.44.0",
+    "eslint": "^8.23.0",
+    "eslint-config-prettier": "^8.5.0",
+    "git-rev-sync": "^3.0.2",
+    "parcel": "2.8.3",
+    "parcel-transformer-ejs": "^1.0.0",
+    "prettier": "^2.7.1",
+    "typescript": "^4.9.3",
+    "underscore": "^1.13.6"
+  }
+}
