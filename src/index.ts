@@ -7,28 +7,46 @@ interface Point {
 }
 
 const screenSize: Point = { x: 800, y: 800 };
+const paddleMargin = 50;
 
 const canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
 canvas.setAttribute("width", screenSize.x.toString());
 canvas.setAttribute("height", screenSize.y.toString());
 
 const context = canvas.getContext("2d");
-// context.fillRect(0, 0, screenSize.x, screenSize.y);
 
 class Game extends chip.Composite {
-  private _ball: Ball;
-  private _paddle: Paddle;
-  private _paddleInput: PaddleInput;
-
   protected _onActivate(): void {
-    this._paddle = new Paddle();
-    this._activateChildChip(this._paddle);
+    const topPaddle = new Paddle(paddleMargin);
+    this._activateChildChip(topPaddle);
 
-    this._paddleInput = new PaddleInput(this._paddle);
-    this._activateChildChip(this._paddleInput);
+    const topPaddleInput = new PaddleInput("ArrowLeft", "ArrowRight");
+    this._activateChildChip(topPaddleInput, {
+      context: {
+        paddle: topPaddle,
+      },
+    });
 
-    this._ball = new Ball(this._paddle);
-    this._activateChildChip(this._ball);
+    const bottomPaddle = new Paddle(screenSize.y - paddleMargin);
+    this._activateChildChip(bottomPaddle);
+
+    const bottomPaddleInput = new PaddleInput("KeyA", "KeyS");
+    this._activateChildChip(bottomPaddleInput, {
+      context: {
+        paddle: bottomPaddle,
+      },
+    });
+
+    const ball = new Ball();
+    this._activateChildChip(ball);
+
+    const physics = new Physics();
+    this._activateChildChip(physics, {
+      context: {
+        ball,
+        paddles: [topPaddle, bottomPaddle],
+      },
+    });
 
     this._draw();
   }
@@ -47,17 +65,9 @@ const ballRadius = 10;
 const ballSpeed = 5;
 
 class Ball extends chip.ChipBase {
-  private _paddle: Paddle;
-
   private _position: Point;
   private _velocity: number;
   private _angle: number; // in radians
-
-  constructor(paddle: Paddle) {
-    super();
-
-    this._paddle = paddle;
-  }
 
   protected _onActivate(): void {
     this._position = { x: screenSize.x / 2, y: screenSize.y / 2 };
@@ -68,52 +78,6 @@ class Ball extends chip.ChipBase {
   }
 
   protected _onTick(): void {
-    const oldPosition = { x: this._position.x, y: this._position.y };
-
-    let deltaX = Math.cos(this._angle) * this._velocity;
-    let deltaY = Math.sin(this._angle) * this._velocity;
-
-    this._position.x += deltaX;
-    this._position.y += deltaY;
-
-    if (this._position.y < ballRadius) {
-      this._position.y = ballRadius;
-
-      deltaY *= -1;
-      this._angle = Math.atan2(deltaY, deltaX);
-    } else if (this._position.y > screenSize.y - ballRadius) {
-      this._position.y = screenSize.y - ballRadius;
-
-      deltaY *= -1;
-      this._angle = Math.atan2(deltaY, deltaX);
-    }
-
-    if (this._position.x < ballRadius) {
-      this._position.x = ballRadius;
-
-      deltaX *= -1;
-      this._angle = Math.atan2(deltaY, deltaX);
-    } else if (this._position.x > screenSize.x - ballRadius) {
-      this._position.x = screenSize.x - ballRadius;
-
-      deltaX *= -1;
-      this._angle = Math.atan2(deltaY, deltaX);
-    }
-
-    // Check for paddle collision
-    if (
-      oldPosition.y < this._paddle.position.y - ballRadius - paddleSize.y / 2 &&
-      this._position.y >
-        this._paddle.position.y - ballRadius - paddleSize.y / 2 &&
-      this._position.x > this._paddle.position.x - paddleSize.x / 2 &&
-      this._position.x < this._paddle.position.x + paddleSize.x / 2
-    ) {
-      this._position.y = this._paddle.position.y - ballRadius;
-
-      deltaY *= -1;
-      this._angle = Math.atan2(deltaY, deltaX);
-    }
-
     this._draw();
   }
 
@@ -125,6 +89,45 @@ class Ball extends chip.ChipBase {
     context.closePath();
     context.fill();
   }
+
+  get position(): Point {
+    return this._position;
+  }
+
+  set position(value: Point) {
+    this._position = value;
+  }
+
+  get angle(): number {
+    return this._angle;
+  }
+
+  get velocity(): number {
+    return this._velocity;
+  }
+
+  getVelocityAsVector(): Point {
+    return {
+      x: Math.cos(this._angle) * this._velocity,
+      y: Math.sin(this._angle) * this._velocity,
+    };
+  }
+
+  bounceVertical(newY: number) {
+    this._position.y = newY;
+
+    const vv = this.getVelocityAsVector();
+    vv.y *= -1;
+    this._angle = Math.atan2(vv.y, vv.x);
+  }
+
+  bounceHorizontal(newX: number) {
+    this._position.x = newX;
+
+    const vv = this.getVelocityAsVector();
+    vv.x *= -1;
+    this._angle = Math.atan2(vv.y, vv.x);
+  }
 }
 
 const paddleSize: Point = { x: 100, y: 10 };
@@ -133,8 +136,12 @@ const paddleSpeed = 5;
 class Paddle extends chip.ChipBase {
   private _position: Point;
 
+  constructor(public readonly yValue: number) {
+    super();
+  }
+
   protected _onActivate(): void {
-    this._position = { x: screenSize.x / 2, y: screenSize.y - 50 };
+    this._position = { x: screenSize.x / 2, y: this.yValue };
 
     this._draw();
   }
@@ -155,11 +162,17 @@ class Paddle extends chip.ChipBase {
   }
 
   moveLeft() {
-    this._position.x -= paddleSpeed;
+    this._position.x = Math.max(
+      paddleSize.x / 2,
+      this._position.x - paddleSpeed
+    );
   }
 
   moveRight() {
-    this._position.x += paddleSpeed;
+    this._position.x = Math.min(
+      screenSize.y - paddleSize.x / 2,
+      this._position.x + paddleSpeed
+    );
   }
 
   get position(): Point {
@@ -168,15 +181,14 @@ class Paddle extends chip.ChipBase {
 }
 
 class PaddleInput extends chip.ChipBase {
-  private _paddle: Paddle;
-
   private _leftDown: boolean;
   private _rightDown: boolean;
 
-  constructor(paddle: Paddle) {
+  constructor(
+    public readonly leftKeyCode: string,
+    public readonly rightKeyCode: string
+  ) {
     super();
-
-    this._paddle = paddle;
   }
 
   protected _onActivate(): void {
@@ -185,22 +197,85 @@ class PaddleInput extends chip.ChipBase {
   }
 
   private _onKeyDown(event: KeyboardEvent) {
-    console.log("down", event.code);
+    // console.log("down", event.code);
 
-    if (event.code === "ArrowLeft") this._leftDown = true;
-    else if (event.code === "ArrowRight") this._rightDown = true;
+    if (event.code === this.leftKeyCode) this._leftDown = true;
+    else if (event.code === this.rightKeyCode) this._rightDown = true;
   }
 
   private _onKeyUp(event: KeyboardEvent) {
-    console.log("up", event.code);
+    // console.log("up", event.code);
 
-    if (event.code === "ArrowLeft") this._leftDown = false;
-    else if (event.code === "ArrowRight") this._rightDown = false;
+    if (event.code === this.leftKeyCode) this._leftDown = false;
+    else if (event.code === this.rightKeyCode) this._rightDown = false;
   }
 
   protected _onTick(): void {
-    if (this._leftDown) this._paddle.moveLeft();
-    else if (this._rightDown) this._paddle.moveRight();
+    const paddle = this._chipContext.paddle as Paddle;
+
+    if (this._leftDown) paddle.moveLeft();
+    else if (this._rightDown) paddle.moveRight();
+  }
+}
+
+export class Physics extends chip.ChipBase {
+  protected _onTick(): void {
+    const ball = this._chipContext.ball as Ball;
+    const paddles = this._chipContext.paddles as Paddle[];
+
+    const oldPosition = ball.position;
+    const delta = ball.getVelocityAsVector();
+    const newPosition = {
+      x: oldPosition.x + delta.x,
+      y: oldPosition.y + delta.y,
+    };
+
+    // By default, move to the new position
+    // May change later due to collision detected
+    ball.position = newPosition;
+
+    // Bounce off walls
+    if (newPosition.y < ballRadius) {
+      ball.bounceVertical(ballRadius);
+    } else if (newPosition.y > screenSize.y - ballRadius) {
+      ball.bounceVertical(screenSize.y - ballRadius);
+    }
+
+    if (newPosition.x < ballRadius) {
+      ball.bounceHorizontal(ballRadius);
+    } else if (newPosition.x > screenSize.x - ballRadius) {
+      ball.bounceHorizontal(screenSize.x - ballRadius);
+    }
+
+    // Bounce off paddles
+    for (const paddle of paddles) {
+      // Check horizontal position
+      if (
+        newPosition.x > paddle.position.x - ballRadius - paddleSize.x / 2 &&
+        newPosition.x < paddle.position.x + ballRadius + paddleSize.x / 2
+      ) {
+        // If going down
+        if (
+          delta.y > 0 &&
+          oldPosition.y < paddle.position.y - ballRadius - paddleSize.y / 2 &&
+          newPosition.y > paddle.position.y - ballRadius - paddleSize.y / 2
+        ) {
+          ball.bounceVertical(
+            paddle.position.y - ballRadius - paddleSize.y / 2
+          );
+        }
+        // If going up
+        else if (
+          delta.y < 0 &&
+          oldPosition.y > paddle.position.y + ballRadius + paddleSize.y / 2 &&
+          newPosition.y < paddle.position.y + ballRadius + paddleSize.y / 2
+        ) {
+          ball.bounceVertical(
+            paddle.position.y + ballRadius + paddleSize.y / 2
+          );
+        }
+      }
+    }
   }
 }
 
