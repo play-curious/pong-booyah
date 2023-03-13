@@ -1,10 +1,8 @@
 # Pong built in Booyah
 
-The results of a 1-hour coding challenge to recreate the classic game Pong using Booyah.
+The results of a 1-hour coding challenge to recreate the classic game Pong in the browser using Typescript and [Booyah](https://github.com/play-curious/booyah).
 
 [![Jesse writes Pong in an hour with Booyah & Typescript](http://img.youtube.com/vi/I2d_LM2PulA/0.jpg)](http://www.youtube.com/watch?v=I2d_LM2PulA "Jesse writes Pong in an hour with Booyah & Typescript")
-
-
 
 ## Development
 
