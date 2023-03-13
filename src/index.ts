@@ -9,14 +9,22 @@ interface Point {
 const screenSize: Point = { x: 800, y: 800 };
 const paddleMargin = 50;
 
-const canvas = document.getElementById("game-canvas") as HTMLCanvasElement;
-canvas.setAttribute("width", screenSize.x.toString());
-canvas.setAttribute("height", screenSize.y.toString());
-
-const context = canvas.getContext("2d");
-
 class Game extends chip.Composite {
+  private _canvas: HTMLCanvasElement;
+  private _renderingContext: CanvasRenderingContext2D;
+
   protected _onActivate(): void {
+    // Setup canvas
+    {
+      this._canvas = document.getElementById(
+        "game-canvas"
+      ) as HTMLCanvasElement;
+      this._canvas.setAttribute("width", screenSize.x.toString());
+      this._canvas.setAttribute("height", screenSize.y.toString());
+
+      this._renderingContext = this._canvas.getContext("2d");
+    }
+
     const topPaddle = new Paddle(paddleMargin);
     this._activateChildChip(topPaddle);
 
@@ -56,8 +64,12 @@ class Game extends chip.Composite {
   }
 
   protected _draw(): void {
-    context.fillStyle = "black";
-    context.fillRect(0, 0, screenSize.x, screenSize.y);
+    this._renderingContext.fillStyle = "black";
+    this._renderingContext.fillRect(0, 0, screenSize.x, screenSize.y);
+  }
+
+  get defaultChildChipContext(): chip.ChipContextResolvable {
+    return { canvas: this._canvas, renderingContext: this._renderingContext };
   }
 }
 
@@ -82,12 +94,14 @@ class Ball extends chip.ChipBase {
   }
 
   protected _draw(): void {
-    context.fillStyle = "white";
+    const cxt = this._chipContext.renderingContext as CanvasRenderingContext2D;
 
-    context.beginPath();
-    context.arc(this._position.x, this._position.y, ballRadius, 0, 2 * Math.PI);
-    context.closePath();
-    context.fill();
+    cxt.fillStyle = "white";
+
+    cxt.beginPath();
+    cxt.arc(this._position.x, this._position.y, ballRadius, 0, 2 * Math.PI);
+    cxt.closePath();
+    cxt.fill();
   }
 
   get position(): Point {
@@ -151,9 +165,11 @@ class Paddle extends chip.ChipBase {
   }
 
   private _draw() {
-    context.fillStyle = "white";
+    const cxt = this._chipContext.renderingContext as CanvasRenderingContext2D;
 
-    context.fillRect(
+    cxt.fillStyle = "white";
+
+    cxt.fillRect(
       this._position.x - paddleSize.x / 2,
       this._position.y - paddleSize.y / 2,
       paddleSize.x,
@@ -192,6 +208,7 @@ class PaddleInput extends chip.ChipBase {
   }
 
   protected _onActivate(): void {
+    const canvas = this._chipContext.canvas as HTMLCanvasElement;
     canvas.addEventListener("keydown", (event) => this._onKeyDown(event));
     canvas.addEventListener("keyup", (event) => this._onKeyUp(event));
   }
