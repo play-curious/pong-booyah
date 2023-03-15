@@ -1,5 +1,6 @@
 import * as chip from "booyah/src/chip";
 import * as running from "booyah/src/running";
+import * as input from "booyah/src/input";
 
 interface Point {
   x: number;
@@ -69,7 +70,10 @@ class Game extends chip.Composite {
   }
 
   get defaultChildChipContext(): chip.ChipContextResolvable {
-    return { canvas: this._canvas, renderingContext: this._renderingContext };
+    return {
+      canvas: this._canvas,
+      renderingContext: this._renderingContext,
+    };
   }
 }
 
@@ -207,31 +211,12 @@ class PaddleInput extends chip.ChipBase {
     super();
   }
 
-  protected _onActivate(): void {
-    const canvas = this._chipContext.canvas as HTMLCanvasElement;
-    canvas.addEventListener("keydown", (event) => this._onKeyDown(event));
-    canvas.addEventListener("keyup", (event) => this._onKeyUp(event));
-  }
-
-  private _onKeyDown(event: KeyboardEvent) {
-    // console.log("down", event.code);
-
-    if (event.code === this.leftKeyCode) this._leftDown = true;
-    else if (event.code === this.rightKeyCode) this._rightDown = true;
-  }
-
-  private _onKeyUp(event: KeyboardEvent) {
-    // console.log("up", event.code);
-
-    if (event.code === this.leftKeyCode) this._leftDown = false;
-    else if (event.code === this.rightKeyCode) this._rightDown = false;
-  }
-
   protected _onTick(): void {
     const paddle = this._chipContext.paddle as Paddle;
+    const keyboard = this._chipContext.keyboard as input.Keyboard;
 
-    if (this._leftDown) paddle.moveLeft();
-    else if (this._rightDown) paddle.moveRight();
+    if (keyboard.keysDown[this.leftKeyCode]) paddle.moveLeft();
+    else if (keyboard.keysDown[this.rightKeyCode]) paddle.moveRight();
   }
 }
 
@@ -296,8 +281,14 @@ export class Physics extends chip.ChipBase {
   }
 }
 
+// Setup keyboard input in the root context
+const rootContextChips = {
+  keyboard: new input.Keyboard(document.getElementById("game-canvas")),
+};
+const rootChip = new chip.ContextProvider(rootContextChips, new Game());
+
 const runner = new running.Runner({
-  rootChip: new Game(),
+  rootChip,
 });
 
 runner.start();
