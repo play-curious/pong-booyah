@@ -14,16 +14,28 @@ class Game extends chip.Composite {
     this._container = new PIXI.Container();
     app.stage.addChild(this._container);
 
+    const goalSprite = new PIXI.Sprite(texture);
+    goalSprite.scale.set(0.3);
+    app.stage.addChild(goalSprite);
+
     const tileCount = new PIXI.Point(10, 10);
     const tileSize = new PIXI.Point(
       baseTexture.width / tileCount.x,
       baseTexture.height / tileCount.y
     );
 
+    const tileContainer = new PIXI.Container();
+    tileContainer.position.set(0, goalSprite.height + 10);
+    this._container.addChild(tileContainer);
+
     for (let i = 0; i < tileCount.x; i++) {
       for (let j = 0; j < tileCount.y; j++) {
         const tile = new Tile(baseTexture, tileSize, new PIXI.Point(i, j));
-        this._activateChildChip(tile);
+        this._activateChildChip(tile, {
+          context: {
+            container: tileContainer,
+          },
+        });
       }
     }
   }
@@ -31,18 +43,12 @@ class Game extends chip.Composite {
   protected _onTerminate(): void {
     this.chipContext.app.removeChild(this._container);
   }
-
-  get defaultChildChipContext(): chip.ChipContextResolvable {
-    return {
-      container: this._container,
-    };
-  }
 }
 
 class Tile extends chip.Composite {
   private _tile: PIXI.Sprite;
   private _rotation: number;
-  private _tween: tween.Tween;
+  private _tween: tween.Tween<number, PIXI.Sprite>;
 
   constructor(
     private readonly _baseTexture: PIXI.BaseTexture,
@@ -74,7 +80,7 @@ class Tile extends chip.Composite {
 
     this._activateChildChip(
       new chip.Sequence([
-        // new chip.Waiting(3000),
+        new chip.Waiting(3000),
         new chip.Lambda(() => {
           this._rotation = (Math.floor(Math.random() * 4) * Math.PI) / 2;
           this._onRotate();
