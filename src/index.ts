@@ -1,294 +1,138 @@
 import * as chip from "booyah/src/chip";
 import * as running from "booyah/src/running";
-import * as input from "booyah/src/input";
+import * as tween from "booyah/src/tween";
 
-interface Point {
-  x: number;
-  y: number;
-}
-
-const screenSize: Point = { x: 800, y: 800 };
-const paddleMargin = 50;
+import * as PIXI from "pixi.js";
 
 class Game extends chip.Composite {
-  private _canvas: HTMLCanvasElement;
-  private _renderingContext: CanvasRenderingContext2D;
+  private _container = new PIXI.Container();
 
   protected _onActivate(): void {
-    // Setup canvas
-    {
-      this._canvas = document.getElementById(
-        "game-canvas"
-      ) as HTMLCanvasElement;
-      this._canvas.setAttribute("width", screenSize.x.toString());
-      this._canvas.setAttribute("height", screenSize.y.toString());
+    const baseTexture = texture.baseTexture;
 
-      this._renderingContext = this._canvas.getContext("2d");
+    const app = this.chipContext.app as PIXI.Application;
+    this._container = new PIXI.Container();
+    app.stage.addChild(this._container);
+
+    const tileCount = new PIXI.Point(10, 10);
+    const tileSize = new PIXI.Point(
+      baseTexture.width / tileCount.x,
+      baseTexture.height / tileCount.y
+    );
+
+    for (let i = 0; i < tileCount.x; i++) {
+      for (let j = 0; j < tileCount.y; j++) {
+        const tile = new Tile(baseTexture, tileSize, new PIXI.Point(i, j));
+        this._activateChildChip(tile);
+      }
     }
-
-    const topPaddle = new Paddle(paddleMargin);
-    this._activateChildChip(topPaddle);
-
-    const topPaddleInput = new PaddleInput("ArrowLeft", "ArrowRight");
-    this._activateChildChip(topPaddleInput, {
-      context: {
-        paddle: topPaddle,
-      },
-    });
-
-    const bottomPaddle = new Paddle(screenSize.y - paddleMargin);
-    this._activateChildChip(bottomPaddle);
-
-    const bottomPaddleInput = new PaddleInput("KeyA", "KeyS");
-    this._activateChildChip(bottomPaddleInput, {
-      context: {
-        paddle: bottomPaddle,
-      },
-    });
-
-    const ball = new Ball();
-    this._activateChildChip(ball);
-
-    const physics = new Physics();
-    this._activateChildChip(physics, {
-      context: {
-        ball,
-        paddles: [topPaddle, bottomPaddle],
-      },
-    });
-
-    this._draw();
   }
 
-  protected _onTick(): void {
-    this._draw();
-  }
-
-  protected _draw(): void {
-    this._renderingContext.fillStyle = "black";
-    this._renderingContext.fillRect(0, 0, screenSize.x, screenSize.y);
+  protected _onTerminate(): void {
+    this.chipContext.app.removeChild(this._container);
   }
 
   get defaultChildChipContext(): chip.ChipContextResolvable {
     return {
-      canvas: this._canvas,
-      renderingContext: this._renderingContext,
+      container: this._container,
     };
   }
 }
 
-const ballRadius = 10;
-const ballSpeed = 5;
-
-class Ball extends chip.ChipBase {
-  private _position: Point;
-  private _velocity: number;
-  private _angle: number; // in radians
-
-  protected _onActivate(): void {
-    this._position = { x: screenSize.x / 2, y: screenSize.y / 2 };
-    this._angle = Math.random() * 2 * Math.PI;
-    this._velocity = ballSpeed;
-
-    this._draw();
-  }
-
-  protected _onTick(): void {
-    this._draw();
-  }
-
-  protected _draw(): void {
-    const cxt = this._chipContext.renderingContext as CanvasRenderingContext2D;
-
-    cxt.fillStyle = "white";
-
-    cxt.beginPath();
-    cxt.arc(this._position.x, this._position.y, ballRadius, 0, 2 * Math.PI);
-    cxt.closePath();
-    cxt.fill();
-  }
-
-  get position(): Point {
-    return this._position;
-  }
-
-  set position(value: Point) {
-    this._position = value;
-  }
-
-  get angle(): number {
-    return this._angle;
-  }
-
-  get velocity(): number {
-    return this._velocity;
-  }
-
-  getVelocityAsVector(): Point {
-    return {
-      x: Math.cos(this._angle) * this._velocity,
-      y: Math.sin(this._angle) * this._velocity,
-    };
-  }
-
-  bounceVertical(newY: number) {
-    this._position.y = newY;
-
-    const vv = this.getVelocityAsVector();
-    vv.y *= -1;
-    this._angle = Math.atan2(vv.y, vv.x);
-  }
-
-  bounceHorizontal(newX: number) {
-    this._position.x = newX;
-
-    const vv = this.getVelocityAsVector();
-    vv.x *= -1;
-    this._angle = Math.atan2(vv.y, vv.x);
-  }
-}
-
-const paddleSize: Point = { x: 100, y: 10 };
-const paddleSpeed = 5;
-
-class Paddle extends chip.ChipBase {
-  private _position: Point;
-
-  constructor(public readonly yValue: number) {
-    super();
-  }
-
-  protected _onActivate(): void {
-    this._position = { x: screenSize.x / 2, y: this.yValue };
-
-    this._draw();
-  }
-
-  protected _onTick(): void {
-    this._draw();
-  }
-
-  private _draw() {
-    const cxt = this._chipContext.renderingContext as CanvasRenderingContext2D;
-
-    cxt.fillStyle = "white";
-
-    cxt.fillRect(
-      this._position.x - paddleSize.x / 2,
-      this._position.y - paddleSize.y / 2,
-      paddleSize.x,
-      paddleSize.y
-    );
-  }
-
-  moveLeft() {
-    this._position.x = Math.max(
-      paddleSize.x / 2,
-      this._position.x - paddleSpeed
-    );
-  }
-
-  moveRight() {
-    this._position.x = Math.min(
-      screenSize.y - paddleSize.x / 2,
-      this._position.x + paddleSpeed
-    );
-  }
-
-  get position(): Point {
-    return this._position;
-  }
-}
-
-class PaddleInput extends chip.ChipBase {
-  private _leftDown: boolean;
-  private _rightDown: boolean;
+class Tile extends chip.Composite {
+  private _tile: PIXI.Sprite;
+  private _rotation: number;
+  private _tween: tween.Tween;
 
   constructor(
-    public readonly leftKeyCode: string,
-    public readonly rightKeyCode: string
+    private readonly _baseTexture: PIXI.BaseTexture,
+    private readonly _tileSize: PIXI.Point,
+    private readonly _index: PIXI.Point
   ) {
     super();
   }
 
-  protected _onTick(): void {
-    const paddle = this._chipContext.paddle as Paddle;
-    const keyboard = this._chipContext.keyboard as input.Keyboard;
+  protected _onActivate(): void {
+    const rect = new PIXI.Rectangle(
+      this._index.x * this._tileSize.x,
+      this._index.y * this._tileSize.y,
+      this._tileSize.x,
+      this._tileSize.y
+    );
+    const tileTexture = new PIXI.Texture(this._baseTexture, rect);
 
-    if (keyboard.keysDown[this.leftKeyCode]) paddle.moveLeft();
-    else if (keyboard.keysDown[this.rightKeyCode]) paddle.moveRight();
+    this._tile = new PIXI.Sprite(tileTexture);
+    this._tile.position.set(
+      this._tileSize.x * (this._index.x + 0.5),
+      this._tileSize.y * (this._index.y + 0.5)
+    );
+    this._tile.anchor.set(0.5);
+    this._tile.interactive = true;
+    this.chipContext.container.addChild(this._tile);
+
+    this._subscribe(this._tile, "pointerup", this._onClick);
+
+    this._activateChildChip(
+      new chip.Sequence([
+        // new chip.Waiting(3000),
+        new chip.Lambda(() => {
+          this._rotation = (Math.floor(Math.random() * 4) * Math.PI) / 2;
+          this._onRotate();
+        }),
+      ])
+    );
+  }
+
+  protected _onTerminate(): void {
+    this.chipContext.app.removeChild(this._container);
+  }
+
+  private _onClick() {
+    this._rotation += Math.PI / 2;
+    this._onRotate();
+  }
+
+  private _onRotate() {
+    if (this._tween) this._terminateChildChip(this._tween);
+
+    this._tween = new tween.Tween({
+      obj: this._tile,
+      property: "rotation",
+      to: this._rotation,
+    });
+    this._activateChildChip(this._tween);
   }
 }
 
-export class Physics extends chip.ChipBase {
-  protected _onTick(): void {
-    const ball = this._chipContext.ball as Ball;
-    const paddles = this._chipContext.paddles as Paddle[];
+// load the texture we need
+let texture: PIXI.Texture;
 
-    const oldPosition = ball.position;
-    const delta = ball.getVelocityAsVector();
-    const newPosition = {
-      x: oldPosition.x + delta.x,
-      y: oldPosition.y + delta.y,
-    };
+async function startPixi() {
+  texture = await PIXI.Assets.load(
+    new URL("images/puppy.png", import.meta.url).pathname
+  );
 
-    // By default, move to the new position
-    // May change later due to collision detected
-    ball.position = newPosition;
+  // The application will create a renderer using WebGL, if possible,
+  // with a fallback to a canvas render. It will also setup the ticker
+  // and the root stage PIXI.Container
+  const app = new PIXI.Application({ resizeTo: window });
 
-    // Bounce off walls
-    if (newPosition.y < ballRadius) {
-      ball.bounceVertical(ballRadius);
-    } else if (newPosition.y > screenSize.y - ballRadius) {
-      ball.bounceVertical(screenSize.y - ballRadius);
-    }
+  // The application will create a canvas element for you that you
+  // can then insert into the DOM
+  document.body.appendChild(app.view);
 
-    if (newPosition.x < ballRadius) {
-      ball.bounceHorizontal(ballRadius);
-    } else if (newPosition.x > screenSize.x - ballRadius) {
-      ball.bounceHorizontal(screenSize.x - ballRadius);
-    }
+  // Setup keyboard input in the root context
+  const rootContextChips = {};
+  const rootChip = new chip.ContextProvider(rootContextChips, new Game());
 
-    // Bounce off paddles
-    for (const paddle of paddles) {
-      // Check horizontal position
-      if (
-        newPosition.x > paddle.position.x - ballRadius - paddleSize.x / 2 &&
-        newPosition.x < paddle.position.x + ballRadius + paddleSize.x / 2
-      ) {
-        // If going down
-        if (
-          delta.y > 0 &&
-          oldPosition.y < paddle.position.y - ballRadius - paddleSize.y / 2 &&
-          newPosition.y > paddle.position.y - ballRadius - paddleSize.y / 2
-        ) {
-          ball.bounceVertical(
-            paddle.position.y - ballRadius - paddleSize.y / 2
-          );
-        }
-        // If going up
-        else if (
-          delta.y < 0 &&
-          oldPosition.y > paddle.position.y + ballRadius + paddleSize.y / 2 &&
-          newPosition.y < paddle.position.y + ballRadius + paddleSize.y / 2
-        ) {
-          ball.bounceVertical(
-            paddle.position.y + ballRadius + paddleSize.y / 2
-          );
-        }
-      }
-    }
-  }
+  const runner = new running.Runner({
+    rootChip,
+    rootContext: {
+      app,
+    },
+  });
+
+  runner.start();
 }
 
-// Setup keyboard input in the root context
-const rootContextChips = {
-  keyboard: new input.Keyboard(document.getElementById("game-canvas")),
-};
-const rootChip = new chip.ContextProvider(rootContextChips, new Game());
-
-const runner = new running.Runner({
-  rootChip,
-});
-
-runner.start();
+startPixi();
